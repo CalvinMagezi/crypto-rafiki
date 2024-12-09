@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Rafiki - Cryptocurrency Price Tracker</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Custom styles -->
+    <style>
+        .price-up { color: #10B981; }
+        .price-down { color: #EF4444; }
+        .loading { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header Section -->
+        <header class="text-center mb-12">
+            <h1 class="text-4xl font-bold mb-2">Crypto Rafiki</h1>
+            <p class="text-gray-400">Real-time cryptocurrency price tracker</p>
+        </header>
+
+        <!-- Main Content -->
+        <div class="max-w-4xl mx-auto">
+            <!-- Search and Filter Section -->
+            <div class="mb-8">
+                <input type="text" 
+                       id="searchInput" 
+                       placeholder="Search cryptocurrencies..." 
+                       class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <!-- Crypto List -->
+            <div id="cryptoList" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <!-- Crypto cards will be inserted here -->
+            </div>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="text-center py-8">
+                <div class="loading text-xl">Loading cryptocurrency data...</div>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="hidden text-center py-8">
+                <div class="text-red-500 text-xl">Error loading cryptocurrency data. Please try again later.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Constants
+        const COINGECKO_API_URL = 'https://api.coingecko.com/api/v3';
+        const REFRESH_INTERVAL = 30000; // 30 seconds
+        const TOP_COINS_COUNT = 30;
+
+        // Cache for storing previous prices
+        let priceCache = new Map();
+
+        // Main function to fetch and display crypto data
+        async function fetchCryptoData() {
+            try {
+                const response = await fetch(`${COINGECKO_API_URL}/simple/price?ids=bitcoin,ethereum,ripple,dogecoin,cardano,polkadot,solana,binancecoin,litecoin,chainlink&vs_currencies=usd&include_24hr_change=true`);
+                
+                if (!response.ok) {
+                    throw new Error('API request failed');
+                }
+
+                const data = await response.json();
+                updateUI(data);
+                document.getElementById('loadingState').classList.add('hidden');
+            } catch (error) {
+                console.error('Error fetching crypto data:', error);
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('errorState').classList.remove('hidden');
+            }
+        }
+
+        // Update the UI with crypto data
+        function updateUI(data) {
+            const cryptoList = document.getElementById('cryptoList');
+            cryptoList.innerHTML = ''; // Clear existing content
+
+            Object.entries(data).forEach(([coinId, priceData]) => {
+                const previousPrice = priceCache.get(coinId);
+                const currentPrice = priceData.usd;
+                const priceChange = priceData.usd_24h_change;
+                
+                // Determine price movement
+                let priceMovement = '';
+                if (previousPrice) {
+                    priceMovement = currentPrice > previousPrice ? 'price-up' : 
+                                  currentPrice < previousPrice ? 'price-down' : '';
+                }
+
+                // Update cache
+                priceCache.set(coinId, currentPrice);
+
+                // Create card element
+                const card = document.createElement('div');
+                card.className = 'bg-gray-800 p-6 rounded-lg shadow-lg transition-all duration-300 hover:transform hover:scale-105';
+                card.innerHTML = `
+                    <h3 class="text-xl font-semibold mb-2 capitalize">${coinId}</h3>
+                    <div class="text-2xl font-bold ${priceMovement}">
+                        $${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    <div class="mt-2 ${priceChange >= 0 ? 'text-green-500' : 'text-red-500'}">
+                        ${priceChange ? priceChange.toFixed(2) + '%' : 'N/A'}
+                        <span class="text-sm">(24h)</span>
+                    </div>
+                `;
+                cryptoList.appendChild(card);
+            });
+        }
+
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const cards = document.querySelectorAll('#cryptoList > div');
+            
+            cards.forEach(card => {
+                const coinName = card.querySelector('h3').textContent.toLowerCase();
+                card.style.display = coinName.includes(searchTerm) ? 'block' : 'none';
+            });
+        });
+
+        // Initial load
+        fetchCryptoData();
+
+        // Set up periodic refresh
+        setInterval(fetchCryptoData, REFRESH_INTERVAL);
+    </script>
+</body>
+</html>
